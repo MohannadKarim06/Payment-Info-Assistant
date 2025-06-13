@@ -18,30 +18,20 @@ class QueryHandler:
             result = "I only answer questions about payment transactions info, What is your question?"
 
         elif response == "1":
-            query_type = "1"
-
-        elif response == "2":
-            query_type = "2"
+            return None
 
         else:
             result = "I only answer questions about payment transactions info, What is your question?"
 
-        return query_type
     
 
-    def search_data(self, query, query_type):
+    def search_data(self, query):
 
-        if query_type == "1":
-            
-            data, score = search_structured(query)
-            
-            return data
-        
-        elif query_type == "2":
+        structured_data = search_structured(query)
 
-            data, score = search_unstructured(query)
+        unstructured_data = search_unstructured(query)
 
-            return data
+        return structured_data, unstructured_data
 
 
     def get_response(data, query):

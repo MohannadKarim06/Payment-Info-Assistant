@@ -3,7 +3,8 @@ import sys
 import faiss
 import numpy as np
 import pickle
-from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModel
+import torch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -13,11 +14,21 @@ class UnstructuredRAGSearcher:
     def __init__(self, 
                  index_path="data/unstructured_index.faiss",
                  chunks_path="data/unstructured_chunks.pkl",
-                 model_name="all-MiniLM-L6-v2"):
+                 model_name="sentence-transformers/all-MiniLM-L6-v2"):
         
         self.index_path = index_path
         self.chunks_path = chunks_path
-        self.model = SentenceTransformer(model_name)
+        
+        # Initialize lightweight transformers model
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.model = AutoModel.from_pretrained(model_name)
+            self.model.eval()  # Set to evaluation mode
+            log_event("SUCCESS", f"Loaded lightweight model: {model_name}")
+        except Exception as e:
+            log_event("ERROR", f"Failed to load model: {e}")
+            self.tokenizer = None
+            self.model = None
         
         # Load FAISS index and chunks
         try:
@@ -30,6 +41,39 @@ class UnstructuredRAGSearcher:
             self.index = None
             self.chunks = []
 
+    def generate_embeddings(self, texts):
+        """
+        Generate embeddings using lightweight transformers
+        """
+        if self.tokenizer is None or self.model is None:
+            log_event("ERROR", "Model not loaded")
+            return None
+        
+        try:
+            # Handle single string input
+            if isinstance(texts, str):
+                texts = [texts]
+            
+            # Tokenize
+            encoded_input = self.tokenizer(
+                texts, 
+                padding=True, 
+                truncation=True, 
+                return_tensors="pt",
+                max_length=512
+            )
+            
+            # Generate embeddings
+            with torch.no_grad():
+                model_output = self.model(**encoded_input)
+                embeddings = model_output.last_hidden_state.mean(dim=1)
+            
+            return embeddings.numpy().astype("float32")
+            
+        except Exception as e:
+            log_event("ERROR", f"Error generating embeddings: {e}")
+            return None
+
     def search_similar_chunks(self, query, top_k=3, threshold=0.7):
         """
         Search for similar chunks using FAISS similarity search
@@ -40,7 +84,9 @@ class UnstructuredRAGSearcher:
         
         try:
             # Encode query
-            query_embedding = self.model.encode([query]).astype('float32')
+            query_embedding = self.generate_embeddings(query)
+            if query_embedding is None:
+                return []
             
             # Search FAISS index
             scores, indices = self.index.search(query_embedding, top_k)
@@ -120,4 +166,3 @@ def search_unstructured(query, top_k=3, threshold=0.7):
     except Exception as e:
         log_event("ERROR", f"Error in unstructured search: {e}")
         return "no data"
-

@@ -31,7 +31,9 @@ class QueryHandler:
 
         unstructured_data = search_unstructured(query)
 
-        return structured_data, unstructured_data
+        data = f"Structured Data:\n{structured_data}\n\nUnstructured Data:\n{unstructured_data}"
+
+        return data
 
 
     def get_response(data, query):

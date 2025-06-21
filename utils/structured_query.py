@@ -17,7 +17,7 @@ class StructuredDataSearcher:
     def __init__(self, 
                  index_path="data/column_index.faiss",
                  metadata_path="data/column_metadata.pkl",
-                 data_path="data/structured_data.csv",
+                 data_path="data\structured_data.xlsx",
                  model_name="all-MiniLM-L6-v2"):
         
         self.index_path = index_path
@@ -30,7 +30,7 @@ class StructuredDataSearcher:
             self.index = faiss.read_index(index_path)
             with open(metadata_path, 'rb') as f:
                 self.column_metadata = pickle.load(f)
-            self.data = pd.read_csv(data_path)
+            self.data = pd.read_excel(data_path)
             log_event("SUCCESS", "Structured data components loaded successfully")
         except Exception as e:
             log_event("ERROR", f"Failed to load structured data components: {e}")
@@ -88,20 +88,9 @@ class StructuredDataSearcher:
             for col in relevant_columns
         ])
         
-        full_prompt = f"""{PANDAS_QUERY_PROMPT}
-
-Available Columns:
-{columns_info}
-
-Available DataFrame name: df
-
-User Query: {query}
-
-Generate a pandas query to answer this question. Return only the executable pandas code without any explanation.
-"""
         
         try:
-            pandas_query = call_llm(query="", prompt=full_prompt, temp=0.1)
+            pandas_query = call_llm(query=query, prompt=PANDAS_QUERY_PROMPT, temp=0.1)
 
             pandas_query = pandas_query.strip()
             if pandas_query.startswith("```python"):

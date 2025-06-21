@@ -207,37 +207,3 @@ def synonym_resolver(query, key_threshold=85, value_threshold=85):
         log_event("ERROR", f"Error in synonym resolution: {e}")
         return query  # Return original query if resolution fails
 
-def create_sample_synonyms_file(output_path="data/synonyms.json"):
-    """
-    Create a sample synonyms file for testing
-    """
-    sample_synonyms = {
-        "XPP": "Outpayce",
-        "Outpayce": "Outpayce",
-        "BAH": "BA Holidays",
-        "BAHolidays": "BA Holidays",
-        "1A": "Amadeus",
-        "Amadeus": "Amadeus",
-        "AP": "Apple Pay",
-        "Apple Pay": "Apple Pay",
-        "GP": "Google Pay",
-        "Google Pay": "Google Pay",
-        "PP": "PayPal",
-        "PayPal": "PayPal",
-        "CC": "Credit Card",
-        "Credit Card": "Credit Card",
-        "DC": "Debit Card",
-        "Debit Card": "Debit Card",
-        "UPI": "Unified Payments Interface",
-        "Unified Payments Interface": "Unified Payments Interface"
-    }
-    
-    try:
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(sample_synonyms, f, indent=2, ensure_ascii=False)
-        log_event("SUCCESS", f"Created sample synonyms file at {output_path}")
-        return True
-    except Exception as e:
-        log_event("ERROR", f"Error creating sample synonyms file: {e}")
-        return False

@@ -6,9 +6,7 @@ from botocore.exceptions import ClientError
 # Initialize Bedrock client
 bedrock_client = boto3.client(
     'bedrock-runtime',
-    region_name=os.getenv('AWS_REGION', 'us-east-1'),
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+    region_name=os.getenv('AWS_REGION', 'eu-north-1'),
 )
 
 def call_llm(query, prompt=None, temp=0.7):
@@ -50,7 +48,7 @@ def call_llm(query, prompt=None, temp=0.7):
         
         # Make API call
         response = bedrock_client.invoke_model(
-            modelId="anthropic.claude-3-5-sonnet-20241022-v2:0",
+            modelId="anthropic.claude-3-7-sonnet-20250219-v1:0",
             contentType="application/json",
             accept="application/json",
             body=json.dumps(body)

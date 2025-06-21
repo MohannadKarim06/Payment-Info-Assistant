@@ -8,6 +8,13 @@ from utils.config import CLASS_INTENT_PROMPT, FINAL_STEP_PROMPT
 from utils.structured_query import search_structured
 from utils.unstructured_rag import search_unstructured
 
+class PipelineReturn(Exception):
+
+    def __init__(self, value):
+        self.value = value
+        super().__init__(f"Pipeline early return with value: {value}")
+
+
 class QueryHandler:
 
     def classify_intent(self, query):
@@ -16,6 +23,7 @@ class QueryHandler:
 
         if response == "0":
             result = "I only answer questions about payment transactions info, What is your question?"
+            raise PipelineReturn(value=result)
 
         elif response == "1":
             return None
@@ -40,6 +48,6 @@ class QueryHandler:
 
         full_prompt = f"{FINAL_STEP_PROMPT}\n\nRetrieved data:\n\n{data}"
 
-        response = call_llm(prompt=full_prompt, query=query)
+        response = call_llm(prompt=full_prompt, query=query, temp=0.5)
 
         return response

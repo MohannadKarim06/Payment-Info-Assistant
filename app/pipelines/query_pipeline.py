@@ -2,7 +2,7 @@ import os, sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from utils.query_handler import QueryHandler
+from utils.query_handler import QueryHandler, PipelineReturn
 from utils.logger import log_event
 from utils.synonym_resolver import synonym_resolver
 
@@ -14,6 +14,8 @@ def query_pipeline(query):
         log_event("PROCESS", "Classifying intent...")
         query_type = query_handler.classify_intent(query)
         log_event("PROCESS", "Intent is classified.")
+    except PipelineReturn as pr:
+        return pr.value
     except Exception as e:
         log_event("ERROR",  f"An error occured while classifying intent: {e}")
         raise e

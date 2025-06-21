@@ -30,7 +30,7 @@ def query_pipeline(query):
     
     try:
         log_event("PROCESS", "Searching data...")
-        data = query_handler.search_data(query_type=query_type, query=query)
+        data = query_handler.search_data(query=query)
         log_event("SUCCESS", f"Data is found.")
     except Exception as e:
         log_event("ERROR",  f"An error occured while searching data: {e}")

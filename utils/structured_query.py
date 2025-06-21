@@ -90,7 +90,8 @@ class StructuredDataSearcher:
         
         
         try:
-            pandas_query = call_llm(query=query, prompt=PANDAS_QUERY_PROMPT, temp=0.1)
+            full_prompt = f"{PANDAS_QUERY_PROMPT}\n\nAvailable Columns:\n{columns_info}"
+            pandas_query = call_llm(query=query, prompt=full_prompt, temp=0.1)
 
             pandas_query = pandas_query.strip()
             if pandas_query.startswith("```python"):

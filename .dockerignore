@@ -1,0 +1,9 @@
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+start.sh
+*.log
+__pycache__/
+structured_data.xlsx

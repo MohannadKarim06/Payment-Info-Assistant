@@ -1,209 +1,201 @@
-import json
-import os
-import sys
-import re
-from rapidfuzz import fuzz, process
+import os, sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.dirname(__file__))  # Current directory (/app/app)
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # Parent directory (/app)
+
+import json
+import re
 
 from utils.logger import log_event
 
-class SynonymResolver:
+class SimpleSynonymResolver:
     def __init__(self, synonyms_path="data/synonyms.json"):
         self.synonyms_path = synonyms_path
         self.synonyms = {}
+        self.normalized_synonyms = {}  # For faster lookup
         self.load_synonyms()
     
     def load_synonyms(self):
         """
-        Load synonyms from JSON file
+        Load synonyms from JSON file and create normalized lookup
         """
         try:
             with open(self.synonyms_path, 'r', encoding='utf-8') as f:
-                self.synonyms = json.load(f)
-            log_event("SUCCESS", f"Loaded {len(self.synonyms)} synonyms from {self.synonyms_path}")
+                raw_synonyms = json.load(f)
+            
+            # Process synonyms and handle list values
+            self.synonyms = {}
+            for key, value in raw_synonyms.items():
+                if isinstance(value, list):
+                    # Take first item if list, or join if multiple items
+                    self.synonyms[key] = value[0] if value else ""
+                else:
+                    self.synonyms[key] = str(value)
+            
+            # Create normalized lookup for faster exact matching
+            self.normalized_synonyms = {}
+            for key, value in self.synonyms.items():
+                # Normalize key for lookup (lowercase, no extra spaces)
+                normalized_key = self._normalize_text(key)
+                self.normalized_synonyms[normalized_key] = {
+                    'original_key': key,
+                    'replacement': value
+                }
+            
+            log_event("SUCCESS", f"Loaded {len(self.synonyms)} synonyms (simple resolver)")
+            
         except FileNotFoundError:
             log_event("ERROR", f"Synonyms file not found: {self.synonyms_path}")
             self.synonyms = {}
+            self.normalized_synonyms = {}
         except json.JSONDecodeError as e:
             log_event("ERROR", f"Invalid JSON in synonyms file: {e}")
             self.synonyms = {}
+            self.normalized_synonyms = {}
         except Exception as e:
             log_event("ERROR", f"Error loading synonyms: {e}")
             self.synonyms = {}
+            self.normalized_synonyms = {}
     
-    def fuzzy_match_keys(self, text, threshold=85):
+    def _normalize_text(self, text):
         """
-        Perform fuzzy matching against synonym keys
+        Normalize text for matching (lowercase, remove extra spaces, basic cleanup)
         """
-        if not self.synonyms:
-            return []
+        if not text:
+            return ""
         
-        matches = []
-        words = text.split()
+        # Convert to lowercase
+        text = text.lower()
         
-        # Try to match individual words and phrases
-        for i in range(len(words)):
-            for j in range(i + 1, len(words) + 1):
-                phrase = ' '.join(words[i:j])
-                
-                # Find best match among keys
-                best_match = process.extractOne(
-                    phrase, 
-                    list(self.synonyms.keys()), 
-                    scorer=fuzz.ratio
-                )
-                
-                if best_match and best_match[1] >= threshold:
-                    matches.append({
-                        'original': phrase,
-                        'matched_key': best_match[0],
-                        'replacement': self.synonyms[best_match[0]],
-                        'score': best_match[1],
-                        'type': 'key_match'
-                    })
+        # Remove extra whitespace
+        text = ' '.join(text.split())
         
-        return matches
+        # Remove common punctuation that might interfere
+        text = re.sub(r'[^\w\s]', '', text)
+        
+        return text.strip()
     
-    def fuzzy_match_values(self, text, threshold=85):
+    def resolve_synonyms(self, query):
         """
-        Perform fuzzy matching against synonym values
-        """
-        if not self.synonyms:
-            return []
-        
-        matches = []
-        words = text.split()
-        unique_values = list(set(self.synonyms.values()))
-        
-        # Try to match individual words and phrases
-        for i in range(len(words)):
-            for j in range(i + 1, len(words) + 1):
-                phrase = ' '.join(words[i:j])
-                
-                # Find best match among values
-                best_match = process.extractOne(
-                    phrase, 
-                    unique_values, 
-                    scorer=fuzz.ratio
-                )
-                
-                if best_match and best_match[1] >= threshold:
-                    matches.append({
-                        'original': phrase,
-                        'matched_value': best_match[0],
-                        'replacement': best_match[0],  # Keep the same value
-                        'score': best_match[1],
-                        'type': 'value_match'
-                    })
-        
-        return matches
-    
-    def resolve_synonyms(self, query, key_threshold=85, value_threshold=85):
-        """
-        Resolve synonyms in the query using fuzzy matching
+        Simple synonym resolution using exact matching on normalized text
         """
         if not query or not self.synonyms:
             return query
         
         original_query = query
         resolved_query = query
-        replacements = []
+        replacements_made = 0
         
-        # First, try matching against keys
-        key_matches = self.fuzzy_match_keys(query, key_threshold)
-        
-        # Then, try matching against values
-        value_matches = self.fuzzy_match_values(query, value_threshold)
-        
-        # Combine and sort matches by score (highest first)
-        all_matches = key_matches + value_matches
-        all_matches.sort(key=lambda x: x['score'], reverse=True)
-        
-        # Apply replacements, avoiding overlaps
-        processed_positions = set()
-        
-        for match in all_matches:
-            original_phrase = match['original']
-            replacement = match['replacement']
+        try:
+            # Split query into words for individual word matching
+            words = query.split()
+            resolved_words = []
             
-            # Find all occurrences of the original phrase
-            pattern = re.escape(original_phrase)
-            matches_iter = re.finditer(pattern, resolved_query, re.IGNORECASE)
-            
-            for match_obj in matches_iter:
-                start, end = match_obj.span()
+            for word in words:
+                normalized_word = self._normalize_text(word)
                 
-                # Check if this position overlaps with already processed positions
-                if not any(pos in range(start, end) for pos in processed_positions):
-                    # Replace the phrase
-                    resolved_query = (
-                        resolved_query[:start] + 
-                        replacement + 
-                        resolved_query[end:]
-                    )
-                    
-                    # Mark positions as processed
-                    processed_positions.update(range(start, end))
-                    
-                    replacements.append({
-                        'original': original_phrase,
-                        'replacement': replacement,
-                        'type': match['type'],
-                        'score': match['score']
-                    })
-                    
-                    # Break after first replacement to avoid position conflicts
-                    break
+                # Check for exact match
+                if normalized_word in self.normalized_synonyms:
+                    replacement_info = self.normalized_synonyms[normalized_word]
+                    replacement = replacement_info['replacement']
+                    resolved_words.append(replacement)
+                    replacements_made += 1
+                    log_event("INFO", f"Replaced '{word}' with '{replacement}'")
+                else:
+                    resolved_words.append(word)
+            
+            # Also check for multi-word phrases (up to 3 words)
+            resolved_query = ' '.join(resolved_words)
+            resolved_query = self._resolve_phrases(resolved_query)
+            
+            if replacements_made > 0:
+                log_event("SUCCESS", f"Applied {replacements_made} synonym replacements")
+            else:
+                log_event("INFO", "No exact synonym matches found")
+            
+            return resolved_query
+            
+        except Exception as e:
+            log_event("ERROR", f"Error in simple synonym resolution: {e}")
+            return original_query  # Return original if resolution fails
+    
+    def _resolve_phrases(self, query):
+        """
+        Resolve multi-word phrases (2-3 words)
+        """
+        words = query.split()
+        if len(words) < 2:
+            return query
         
-        if replacements:
-            log_event("SUCCESS", f"Applied {len(replacements)} synonym replacements")
-            for replacement in replacements:
-                log_event("INFO", f"Replaced '{replacement['original']}' with '{replacement['replacement']}' (score: {replacement['score']})")
-        else:
-            log_event("INFO", "No synonym replacements found")
+        resolved_query = query
+        replacements_made = 0
+        
+        # Check 2-word phrases
+        for i in range(len(words) - 1):
+            phrase = f"{words[i]} {words[i+1]}"
+            normalized_phrase = self._normalize_text(phrase)
+            
+            if normalized_phrase in self.normalized_synonyms:
+                replacement_info = self.normalized_synonyms[normalized_phrase]
+                replacement = replacement_info['replacement']
+                resolved_query = resolved_query.replace(phrase, replacement, 1)
+                replacements_made += 1
+                log_event("INFO", f"Replaced phrase '{phrase}' with '{replacement}'")
+        
+        # Check 3-word phrases
+        for i in range(len(words) - 2):
+            phrase = f"{words[i]} {words[i+1]} {words[i+2]}"
+            normalized_phrase = self._normalize_text(phrase)
+            
+            if normalized_phrase in self.normalized_synonyms:
+                replacement_info = self.normalized_synonyms[normalized_phrase]
+                replacement = replacement_info['replacement']
+                resolved_query = resolved_query.replace(phrase, replacement, 1)
+                replacements_made += 1
+                log_event("INFO", f"Replaced phrase '{phrase}' with '{replacement}'")
         
         return resolved_query
     
-    def add_synonym(self, key, value):
+    def get_stats(self):
         """
-        Add a new synonym to the dictionary
+        Get statistics about loaded synonyms
         """
-        self.synonyms[key] = value
-        try:
-            with open(self.synonyms_path, 'w', encoding='utf-8') as f:
-                json.dump(self.synonyms, f, indent=2, ensure_ascii=False)
-            log_event("SUCCESS", f"Added synonym: {key} -> {value}")
-        except Exception as e:
-            log_event("ERROR", f"Error saving synonym: {e}")
-    
-    def get_all_synonyms(self):
-        """
-        Get all loaded synonyms
-        """
-        return self.synonyms.copy()
+        return {
+            'total_synonyms': len(self.synonyms),
+            'normalized_entries': len(self.normalized_synonyms),
+            'file_path': self.synonyms_path,
+            'loaded': len(self.synonyms) > 0
+        }
 
-# Global instance
-_synonym_resolver_instance = None
+# Global instance for singleton pattern
+_simple_synonym_resolver_instance = None
 
-def get_synonym_resolver():
+def get_simple_synonym_resolver():
     """
-    Get singleton instance of SynonymResolver
+    Get singleton instance of SimpleSynonymResolver
     """
-    global _synonym_resolver_instance
-    if _synonym_resolver_instance is None:
-        _synonym_resolver_instance = SynonymResolver()
-    return _synonym_resolver_instance
+    global _simple_synonym_resolver_instance
+    if _simple_synonym_resolver_instance is None:
+        _simple_synonym_resolver_instance = SimpleSynonymResolver()
+    return _simple_synonym_resolver_instance
 
-def synonym_resolver(query, key_threshold=85, value_threshold=85):
+def simple_synonym_resolver(query):
     """
-    Main function to resolve synonyms in a query
+    Main function to resolve synonyms using simple exact matching
+    Fast and lightweight - no fuzzy matching
     """
     try:
-        resolver = get_synonym_resolver()
-        resolved_query = resolver.resolve_synonyms(query, key_threshold, value_threshold)
+        resolver = get_simple_synonym_resolver()
+        resolved_query = resolver.resolve_synonyms(query)
         return resolved_query
     except Exception as e:
-        log_event("ERROR", f"Error in synonym resolution: {e}")
+        log_event("ERROR", f"Error in simple synonym resolution: {e}")
         return query  # Return original query if resolution fails
 
+# Compatibility function to replace the old synonym_resolver
+def synonym_resolver(query, key_threshold=85, value_threshold=85):
+    """
+    Lightweight replacement for the original synonym_resolver
+    Ignores threshold parameters and uses exact matching instead
+    """
+    return simple_synonym_resolver(query)

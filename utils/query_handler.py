@@ -1,6 +1,7 @@
 import os, sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.dirname(__file__))  # Current directory (/app/app)
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # Parent directory (/app)
 
 from app.api.bedrock_client import call_llm
 from utils.logger import log_event

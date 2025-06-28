@@ -8,7 +8,7 @@ import io
 
 # Configuration
 API_BASE_URL = "http://localhost:8000"  # Will be updated for Docker
-TIMEOUT = 30
+TIMEOUT = 120
 
 # Page configuration
 st.set_page_config(
@@ -214,13 +214,6 @@ def show_chat_page():
         
         with col1:
             ask_button = st.button("🚀 Ask Question", type="primary")
-        
-        with col2:
-            clear_button = st.button("🗑️ Clear")
-        
-        if clear_button:
-            st.session_state.query_input = ""
-            st.rerun()
         
         # Process query
         if ask_button and user_query.strip():

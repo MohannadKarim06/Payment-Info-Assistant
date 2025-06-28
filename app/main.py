@@ -7,8 +7,8 @@ from typing import Optional
 import json
 import uvicorn
 
-# Add the parent directory to the path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.dirname(__file__))  # Current directory (/app/app)
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # Parent directory (/app)
 
 from pipelines.query_pipeline import query_pipeline
 from utils.logger import log_event, get_logs

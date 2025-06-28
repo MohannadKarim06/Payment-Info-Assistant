@@ -5,7 +5,8 @@ import json
 from datetime import datetime
 from typing import List, Dict, Optional
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.dirname(__file__))  # Current directory (/app/app)
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # Parent directory (/app)
 
 # Default logs directory and file
 LOGS_DIR = "logs"

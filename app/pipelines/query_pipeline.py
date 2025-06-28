@@ -1,10 +1,11 @@
 import os, sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.dirname(__file__))  # Current directory (/app/app)
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # Parent directory (/app)
 
 from utils.query_handler import QueryHandler, PipelineReturn
+from utils.synonym_resolver import simple_synonym_resolver as synonym_resolver
 from utils.logger import log_event
-from utils.synonym_resolver import synonym_resolver
 
 query_handler = QueryHandler()
 
@@ -22,7 +23,7 @@ def query_pipeline(query):
 
     try:
         log_event("PROCESS", "Resolving synonyms...")
-        query = synonym_resolver(query)
+#        query = synonym_resolver(query)
         log_event("SUCCESS", "Synonyms are resolved.")
     except Exception as e:
         log_event("ERROR",  f"An error occured while resolving synonyms: {e}")

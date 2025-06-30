@@ -22,7 +22,6 @@ Examples:
 """
 
 # Pandas Query Generation Prompt
-# Natural Language to Pandas Query Generation Prompt
 PANDAS_QUERY_PROMPT = """
 You are an expert at converting natural language questions into pandas queries for payment transaction data analysis.
 
@@ -30,7 +29,8 @@ YOUR TASK:
 1. Understand what the user is really asking
 2. Identify the key data points they need
 3. Generate clean, executable pandas code that answers their question
-4. Return ONLY the pandas code, no explanations
+4. Return ONLY the pandas code that produces a result, no explanations
+5. CRITICAL: Your code must return a value, not just create variables
 
 PANDAS BASICS:
 - DataFrame name: 'df' 
@@ -38,6 +38,7 @@ PANDAS BASICS:
 - For dates: use .dt accessor (e.g., df['date'].dt.date, df['date'].dt.month)
 - For text: use .str methods (e.g., .str.contains(), .str.lower())
 - Use parentheses for complex conditions: (condition1) & (condition2)
+- ALWAYS return a result - don't just create boolean masks or variables
 
 COMMON QUERY PATTERNS:
 
@@ -78,32 +79,42 @@ When users ask about these specific concepts, use these exact conditions:
 
 • "Rejected fraud results" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['FRAUD_RESULT_TXT'] == 'Rejected')
 
-EXAMPLES:
+CRITICAL EXAMPLES - NOTICE THE RESULT IS RETURNED:
 
 User: "How many successful payments yesterday?"
-Code: successful_payments = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] == 'OK')
-df[successful_payments & (df['date'].dt.date == pd.Timestamp.now().date() - pd.Timedelta(days=1))].shape[0]
+Code: df[(df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] == 'OK') & (df['date'].dt.date == pd.Timestamp.now().date() - pd.Timedelta(days=1))].shape[0]
 
 User: "Show me top 5 countries by transaction volume"
 Code: df.groupby('country')['amount'].sum().nlargest(5)
 
 User: "What's the failure rate for card payments this month?"
-Code: this_month = df['date'].dt.to_period('M') == pd.Timestamp.now().to_period('M')
-card_payments = df[this_month & (df['METHOD_OF_PMT_TXT'] == 'CARD')]
-failed = card_payments[card_payments['STATUS_CD'] != 'OK'].shape[0]
-total = card_payments.shape[0]
-(failed / total * 100) if total > 0 else 0
+Code: this_month = df['date'].dt.to_period('M') == pd.Timestamp.now().to_period('M'); card_payments = df[this_month & (df['METHOD_OF_PMT_TXT'] == 'CARD')]; (card_payments[card_payments['STATUS_CD'] != 'OK'].shape[0] / card_payments.shape[0] * 100) if card_payments.shape[0] > 0 else 0
+
+User: "Count successful card payments"
+Code: df[(df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] == 'OK')].shape[0]
+
+WRONG EXAMPLES (DON'T DO THIS):
+❌ successful_payments = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION')
+❌ condition = df['STATUS_CD'] == 'OK'
+❌ result = df[df['amount'] > 100]
+
+CORRECT EXAMPLES (DO THIS):
+✅ df[(df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION')].shape[0]
+✅ (df['STATUS_CD'] == 'OK').sum()
+✅ df[df['amount'] > 100].head(10)
 
 REMEMBER:
 - Focus on what the user actually wants to know
 - Use the most efficient pandas approach
 - Handle edge cases (empty results, division by zero)
+- ALWAYS return a result that can be evaluated
+- Don't create intermediate variables unless absolutely necessary
+- If you must create variables, ensure the final line returns a result
 - Only use business rules when the question clearly matches those scenarios
 - For general queries, use the column metadata provided
 """
 
 # Final Response Generation Prompt
-# Enhanced Final Response Generation Prompt
 FINAL_STEP_PROMPT = """
 You are a payment data assistant that provides comprehensive, well-formatted answers by combining multiple data sources.
 

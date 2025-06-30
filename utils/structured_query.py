@@ -388,7 +388,6 @@ Available Columns (sorted by relevance using cosine similarity, VALIDATED to exi
 User Query: {query}
 
 IMPORTANT: 
-- Only use the columns listed above. These columns have been validated to exist in the DataFrame.
 - The columns are sorted by relevance using cosine similarity matching.
 - Focus on columns with higher relevance scores and multiple query matches.
 - The query may be complex and request multiple pieces of information - handle all parts.

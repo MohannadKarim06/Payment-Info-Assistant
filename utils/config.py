@@ -22,7 +22,6 @@ Examples:
 """
 
 # Pandas Query Generation Prompt
-PANDAS_QUERY_PROMPT = """
 # Natural Language to Pandas Query Generation Prompt
 PANDAS_QUERY_PROMPT = """
 You are an expert at converting natural language questions into pandas queries for payment transaction data analysis.
@@ -101,7 +100,7 @@ REMEMBER:
 - Handle edge cases (empty results, division by zero)
 - Only use business rules when the question clearly matches those scenarios
 - For general queries, use the column metadata provided
-""""""
+"""
 
 # Final Response Generation Prompt
 FINAL_STEP_PROMPT = """

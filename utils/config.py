@@ -35,7 +35,8 @@ YOUR TASK:
 PANDAS BASICS:
 - DataFrame name: 'df' 
 - Always handle null values: use .notna(), .fillna(), or na=False in string operations
-- For dates: use .dt accessor (e.g., df['date'].dt.date, df['date'].dt.month)
+- For dates: use .dt accessor on TX_TS column (e.g., df['TX_TS'].dt.date, df['TX_TS'].dt.month)
+- TX_TS format: "6/8/2025 5:09:39 PM" - ensure proper datetime conversion with pd.to_datetime() if needed
 - For text: use .str methods (e.g., .str.contains(), .str.lower(), .str.upper())
 - Use parentheses for complex conditions: (condition1) & (condition2)
 - ALWAYS return a result - don't just create boolean masks or variables
@@ -57,8 +58,9 @@ COMMON QUERY PATTERNS:
 - "Top 10..." → df.groupby('col')['amount'].sum().nlargest(10)
 
 **Time-based:**
-- "Yesterday/last week..." → df[df['date'].dt.date == specific_date]
-- "Monthly trends..." → df.groupby(df['date'].dt.to_period('M'))['amount'].sum()
+- "Yesterday/last week..." → df[df['TX_TS'].dt.date == specific_date]
+- "Monthly trends..." → df.groupby(df['TX_TS'].dt.to_period('M'))['amount'].sum()
+- Date format in TX_TS: "6/8/2025 5:09:39 PM" - use pd.to_datetime() if needed
 
 **Comparisons:**
 - "Success vs failure rates..." → df.groupby('status').size()
@@ -84,13 +86,13 @@ When users ask about these specific concepts, use these exact conditions (ALWAYS
 CRITICAL EXAMPLES - NOTICE THE RESULT IS RETURNED AND CASE-INSENSITIVE MATCHING:
 
 User: "How many successful payments yesterday?"
-Code: df[(df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() == 'OK') & (df['date'].dt.date == pd.Timestamp.now().date() - pd.Timedelta(days=1))].shape[0]
+Code: df[(df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() == 'OK') & (df['TX_TS'].dt.date == pd.Timestamp.now().date() - pd.Timedelta(days=1))].shape[0]
 
 User: "Show me top 5 countries by transaction volume"
 Code: df.groupby('country')['amount'].sum().nlargest(5)
 
 User: "What's the failure rate for card payments this month?"
-Code: this_month = df['date'].dt.to_period('M') == pd.Timestamp.now().to_period('M'); card_payments = df[this_month & (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD')]; (card_payments[card_payments['STATUS_CD'].str.upper() != 'OK'].shape[0] / card_payments.shape[0] * 100) if card_payments.shape[0] > 0 else 0
+Code: this_month = df['TX_TS'].dt.to_period('M') == pd.Timestamp.now().to_period('M'); card_payments = df[this_month & (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD')]; (card_payments[card_payments['STATUS_CD'].str.upper() != 'OK'].shape[0] / card_payments.shape[0] * 100) if card_payments.shape[0] > 0 else 0
 
 User: "Count successful card payments"
 Code: df[(df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() == 'OK')].shape[0]

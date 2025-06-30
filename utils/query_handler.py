@@ -124,13 +124,6 @@ USER QUERY: {query}
 
 RETRIEVED DATA:
 {data}
-
-IMPORTANT INSTRUCTIONS:
-- Clearly distinguish between structured data (transaction database), unstructured data (documents/policies), and general knowledge
-- Use the exact source attribution format specified in the prompt
-- Provide specific insights from each data source
-- If no data is available from a source, acknowledge this explicitly
-- Synthesize information from all available sources to provide a comprehensive answer
 """
             
             response = call_llm(prompt=full_prompt, query=query, temp=0.3)

@@ -143,6 +143,15 @@ def get_stats():
     except Exception as e:
         return {"error": str(e)}
 
+def clear_chat():
+    """Clear chat input and response"""
+    if "query_input" in st.session_state:
+        st.session_state.query_input = ""
+    if "last_response" in st.session_state:
+        del st.session_state.last_response
+    if "last_query" in st.session_state:
+        del st.session_state.last_query
+
 def main():
     # Header
     st.markdown('<h1 class="main-header">💳 Payment Info Assistant</h1>', unsafe_allow_html=True)
@@ -197,59 +206,73 @@ def show_chat_page():
         - "How many successful payments were processed yesterday?"
         """)
     
-    # Chat interface
-    with st.container():
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    # Query input
+    user_query = st.text_area(
+        "Enter your question:",
+        height=100,
+        placeholder="Ask me anything about payment data...",
+        key="query_input"
+    )
+    
+    # Buttons row
+    col1, col2, col3 = st.columns([1, 1, 4])
+    
+    with col1:
+        ask_button = st.button("🚀 Ask Question", type="primary")
+    
+    with col2:
+        clear_button = st.button("🗑️ Clear", type="secondary")
+    
+    # Handle clear button click
+    if clear_button:
+        clear_chat()
+        st.rerun()
+    
+    # Process query
+    if ask_button and user_query.strip():
+        with st.spinner("🔍 Processing your question..."):
+            response_data = ask_question(user_query.strip())
         
-        # Query input
-        user_query = st.text_area(
-            "Enter your question:",
-            height=100,
-            placeholder="Ask me anything about payment data...",
-            key="query_input"
-        )
+        # Store response in session state
+        st.session_state.last_response = response_data
+        st.session_state.last_query = user_query.strip()
+    
+    elif ask_button and not user_query.strip():
+        st.warning("⚠️ Please enter a question before submitting.")
+    
+    # Display stored response if available
+    if "last_response" in st.session_state and "last_query" in st.session_state:
+        response_data = st.session_state.last_response
         
-        # Submit button
-        col1, col2, col3 = st.columns([1, 1, 4])
+        # Display the question that was asked
+        st.markdown("**Your Question:**")
+        st.info(st.session_state.last_query)
         
-        with col1:
-            ask_button = st.button("🚀 Ask Question", type="primary")
-        
-        # Process query
-        if ask_button and user_query.strip():
-            with st.spinner("🔍 Processing your question..."):
-                response_data = ask_question(user_query.strip())
+        # Display response
+        if response_data.get("success", False):
+            st.markdown('<div class="success-container">', unsafe_allow_html=True)
+            st.success("✅ Question processed successfully!")
+            st.markdown('</div>', unsafe_allow_html=True)
             
-            # Display response
-            if response_data.get("success", False):
-                st.markdown('<div class="success-container">', unsafe_allow_html=True)
-                st.success("✅ Question processed successfully!")
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                st.markdown('<div class="response-container">', unsafe_allow_html=True)
-                st.markdown("**Response:**")
-                st.write(response_data["response"])
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Show metadata if available
-                if response_data.get("metadata"):
-                    with st.expander("📊 Query Details"):
-                        st.json(response_data["metadata"])
+            st.markdown('<div class="response-container">', unsafe_allow_html=True)
+            st.markdown("**Response:**")
+            st.write(response_data["response"])
+            st.markdown('</div>', unsafe_allow_html=True)
             
-            else:
-                st.markdown('<div class="error-container">', unsafe_allow_html=True)
-                st.error("❌ Error processing question")
-                st.write(response_data.get("response", "Unknown error occurred"))
-                
-                if response_data.get("error"):
-                    with st.expander("🔍 Error Details"):
-                        st.code(response_data["error"])
-                st.markdown('</div>', unsafe_allow_html=True)
+            # Show metadata if available
+            if response_data.get("metadata"):
+                with st.expander("📊 Query Details"):
+                    st.json(response_data["metadata"])
         
-        elif ask_button and not user_query.strip():
-            st.warning("⚠️ Please enter a question before submitting.")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="error-container">', unsafe_allow_html=True)
+            st.error("❌ Error processing question")
+            st.write(response_data.get("response", "Unknown error occurred"))
+            
+            if response_data.get("error"):
+                with st.expander("🔍 Error Details"):
+                    st.code(response_data["error"])
+            st.markdown('</div>', unsafe_allow_html=True)
 
 def show_logs_page():
     """Display the logs interface"""

@@ -23,7 +23,7 @@ def query_pipeline(query):
 
     try:
         log_event("PROCESS", "Resolving synonyms...")
-#        query = synonym_resolver(query)
+        query = synonym_resolver(query)
         log_event("SUCCESS", "Synonyms are resolved.")
     except Exception as e:
         log_event("ERROR",  f"An error occured while resolving synonyms: {e}")

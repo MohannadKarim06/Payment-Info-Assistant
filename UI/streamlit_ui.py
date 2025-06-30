@@ -145,12 +145,13 @@ def get_stats():
 
 def clear_chat():
     """Clear chat input and response"""
-    if "query_input" in st.session_state:
-        st.session_state.query_input = ""
+    # Clear stored responses and queries
     if "last_response" in st.session_state:
         del st.session_state.last_response
     if "last_query" in st.session_state:
         del st.session_state.last_query
+    # Set a flag to clear the input on next render
+    st.session_state.clear_input = True
 
 def main():
     # Header
@@ -207,8 +208,17 @@ def show_chat_page():
         """)
     
     # Query input
+    # Check if we need to clear the input
+    default_value = ""
+    if st.session_state.get("clear_input", False):
+        default_value = ""
+        st.session_state.clear_input = False
+    else:
+        default_value = st.session_state.get("query_input", "")
+    
     user_query = st.text_area(
         "Enter your question:",
+        value=default_value,
         height=100,
         placeholder="Ask me anything about payment data...",
         key="query_input"

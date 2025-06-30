@@ -36,9 +36,11 @@ PANDAS BASICS:
 - DataFrame name: 'df' 
 - Always handle null values: use .notna(), .fillna(), or na=False in string operations
 - For dates: use .dt accessor (e.g., df['date'].dt.date, df['date'].dt.month)
-- For text: use .str methods (e.g., .str.contains(), .str.lower())
+- For text: use .str methods (e.g., .str.contains(), .str.lower(), .str.upper())
 - Use parentheses for complex conditions: (condition1) & (condition2)
 - ALWAYS return a result - don't just create boolean masks or variables
+- CRITICAL: Always use case-insensitive matching with .str.upper() or .str.lower() for text comparisons
+- Handle potential null values in string columns with .fillna('') before .str operations
 
 COMMON QUERY PATTERNS:
 
@@ -63,35 +65,35 @@ COMMON QUERY PATTERNS:
 - "Percentage..." → (condition_count / total_count) * 100
 
 PAYMENT-SPECIFIC BUSINESS LOGIC:
-When users ask about these specific concepts, use these exact conditions:
+When users ask about these specific concepts, use these exact conditions (ALWAYS use case-insensitive matching):
 
-• "Successful card payments" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] == 'OK')
+• "Successful card payments" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() == 'OK')
 
-• "Failed card payments" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['STATUS_CD'] != 'OK')
+• "Failed card payments" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['STATUS_CD'].str.upper() != 'OK')
 
-• "Card authorization failures" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] != 'OK')
+• "Card authorization failures" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() != 'OK')
 
-• "Successful 3DS authentication" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == '3DS') & (df['AUTH_TX_STATUS_3DS_CD'].isin(['Y', 'A']))
+• "Successful 3DS authentication" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == '3DS') & (df['AUTH_TX_STATUS_3DS_CD'].str.upper().isin(['Y', 'A']))
 
-• "Failed 3DS authentication" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == '3DS') & (df['AUTH_TX_STATUS_3DS_CD'].isin(['N', 'U', 'R']))
+• "Failed 3DS authentication" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == '3DS') & (df['AUTH_TX_STATUS_3DS_CD'].str.upper().isin(['N', 'U', 'R']))
 
-• "Accepted fraud results" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['FRAUD_RESULT_TXT'].isin(['Accepted', 'Review']))
+• "Accepted fraud results" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['FRAUD_RESULT_TXT'].str.upper().isin(['ACCEPTED', 'REVIEW']))
 
-• "Rejected fraud results" = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['FRAUD_RESULT_TXT'] == 'Rejected')
+• "Rejected fraud results" = (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['FRAUD_RESULT_TXT'].str.upper() == 'REJECTED')
 
-CRITICAL EXAMPLES - NOTICE THE RESULT IS RETURNED:
+CRITICAL EXAMPLES - NOTICE THE RESULT IS RETURNED AND CASE-INSENSITIVE MATCHING:
 
 User: "How many successful payments yesterday?"
-Code: df[(df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] == 'OK') & (df['date'].dt.date == pd.Timestamp.now().date() - pd.Timedelta(days=1))].shape[0]
+Code: df[(df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() == 'OK') & (df['date'].dt.date == pd.Timestamp.now().date() - pd.Timedelta(days=1))].shape[0]
 
 User: "Show me top 5 countries by transaction volume"
 Code: df.groupby('country')['amount'].sum().nlargest(5)
 
 User: "What's the failure rate for card payments this month?"
-Code: this_month = df['date'].dt.to_period('M') == pd.Timestamp.now().to_period('M'); card_payments = df[this_month & (df['METHOD_OF_PMT_TXT'] == 'CARD')]; (card_payments[card_payments['STATUS_CD'] != 'OK'].shape[0] / card_payments.shape[0] * 100) if card_payments.shape[0] > 0 else 0
+Code: this_month = df['date'].dt.to_period('M') == pd.Timestamp.now().to_period('M'); card_payments = df[this_month & (df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD')]; (card_payments[card_payments['STATUS_CD'].str.upper() != 'OK'].shape[0] / card_payments.shape[0] * 100) if card_payments.shape[0] > 0 else 0
 
 User: "Count successful card payments"
-Code: df[(df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION') & (df['STEP_TXT'] == 'REQUEST') & (df['STATUS_CD'] == 'OK')].shape[0]
+Code: df[(df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION') & (df['STEP_TXT'].str.upper() == 'REQUEST') & (df['STATUS_CD'].str.upper() == 'OK')].shape[0]
 
 WRONG EXAMPLES (DON'T DO THIS):
 ❌ successful_payments = (df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION')
@@ -99,8 +101,8 @@ WRONG EXAMPLES (DON'T DO THIS):
 ❌ result = df[df['amount'] > 100]
 
 CORRECT EXAMPLES (DO THIS):
-✅ df[(df['METHOD_OF_PMT_TXT'] == 'CARD') & (df['TX_TYP'] == 'AUTHORIZATION')].shape[0]
-✅ (df['STATUS_CD'] == 'OK').sum()
+✅ df[(df['METHOD_OF_PMT_TXT'].str.upper() == 'CARD') & (df['TX_TYP'].str.upper() == 'AUTHORIZATION')].shape[0]
+✅ (df['STATUS_CD'].str.upper() == 'OK').sum()
 ✅ df[df['amount'] > 100].head(10)
 
 REMEMBER:

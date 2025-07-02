@@ -4,18 +4,18 @@
     "BAH": "BA Holidays",
     "BAHolidays": "BA Holidays",
     "1A": "Amadeus",
-	"card payment success rate":"card payment success status",
-	"card success rate":"card payment success status",
-        "payment success factor":"card payment success status",
-    "success factor for cards":"card payment success status",
-    "card success factor":"card payment success status",
-    "successful authorisations": "card payment success status",
+	"card payment success rate":"% of successful payments from all card payments",
+	"card success rate":"% of successful payments from all card payments",
+        "payment success factor":"% of successful payments from all card payments",
+    "success factor for cards":"% of successful payments from all card payments",
+    "card success factor":"% of successful payments from all card payments",
+    "successful authorisations": "% of successful payments from all card payments",
 
-	"card payment failure rate":"Card payment failure status",
-	"card failure rate":"Card payment failure status",
-        "payment failure factor":"Card payment failure status",
-    "failure factor for cards":"Card payment failure status",
-    "card failure factor":"Card payment failure status",
+	"card payment failure rate":"% of failed payments from all card payments",
+	"card failure rate":"% of failed payments from all card payments",
+        "payment failure factor":"% of failed payments from all card payments",
+    "failure factor for cards":"% of failed payments from all card payments",
+    "card failure factor":"% of failed payments from all card payments",
     "unsuccessful card payments": "Card payment failure status",
     "failed card payments": "Card payment failure status",
     "failed card authorisation": "Card authorisation failure status",
@@ -81,6 +81,7 @@
 "CCY":"Currency",
 
     "failed payment": "error",
+
     "unsuccessful payment": "error",
     "declined payment": "error",
     "Payment transaction": "payment",
@@ -212,7 +213,6 @@
   "exchange": "fx",
   "Scheme token": "Network Token", 
     "device token": "DPAN",
-    "device pan":"DPAN"
-    "funding card": "FPAN"
-  
+    "device pan":"DPAN",
+    "funding card": "FPAN",  
 }

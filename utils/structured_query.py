@@ -10,6 +10,8 @@ from rapidfuzz import fuzz
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
+import ast
+import traceback
 
 sys.path.insert(0, os.path.dirname(__file__))  # Current directory (/app/app)
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # Parent directory (/app)
@@ -379,19 +381,39 @@ class StructuredDataSearcher:
         ])
 
         try:
+            # Enhanced prompt for multi-line pandas queries
             enhanced_prompt = f"""
 {PANDAS_QUERY_PROMPT}
+
+MULTI-LINE PANDAS QUERY SUPPORT:
+- You can now write multiple lines of pandas code
+- Use intermediate variables to build complex analyses
+- The final line should assign the result to a variable named 'result'
+- Example multi-line format:
+  ```
+  # Step 1: Filter data
+  filtered_df = df[df['STATUS_CD'].str.upper() == 'OK']
+  
+  # Step 2: Group and aggregate
+  grouped = filtered_df.groupby('COUNTRY')['AMOUNT'].sum()
+  
+  # Step 3: Get top results
+  result = grouped.nlargest(10)
+  ```
+
+IMPORTANT RULES:
+- Always assign final output to variable named 'result'
+- Use descriptive variable names for intermediate steps
+- Add comments to explain complex logic
+- Handle null values appropriately
+- Use case-insensitive matching with .str.upper() or .str.lower()
 
 Available Columns (sorted by relevance using cosine similarity, VALIDATED to exist in DataFrame):
 {columns_info}
 
 User Query: {query}
 
-IMPORTANT: 
-- The columns are sorted by relevance using cosine similarity matching.
-- Focus on columns with higher relevance scores and multiple query matches.
-- The query may be complex and request multiple pieces of information - handle all parts.
-- Generate a pandas query that comprehensively addresses the user's natural language request.
+Generate pandas code that comprehensively addresses the user's request. Use multiple lines if needed for clarity and complex analysis.
 """
 
             pandas_query = call_llm(query=query, prompt=enhanced_prompt, temp=0.1)
@@ -410,24 +432,141 @@ IMPORTANT:
             log_event("ERROR", f"Error generating pandas query: {e}")
             return None
 
+    def is_safe_code(self, code):
+        """
+        Check if the code is safe to execute by parsing the AST
+        """
+        try:
+            # Parse the code into an AST
+            tree = ast.parse(code)
+            
+            # Define allowed node types for pandas operations
+            allowed_nodes = {
+                ast.Module, ast.Expr, ast.Assign, ast.Name, ast.Load, ast.Store,
+                ast.Attribute, ast.Call, ast.Subscript, ast.Index, ast.Slice,
+                ast.BinOp, ast.UnaryOp, ast.Compare, ast.BoolOp, ast.IfExp,
+                ast.List, ast.Tuple, ast.Dict, ast.Set, ast.ListComp, ast.DictComp,
+                ast.GeneratorExp, ast.Constant, ast.Str, ast.Num, ast.NameConstant,
+                ast.JoinedStr, ast.FormattedValue, ast.keyword, ast.arg,
+                ast.comprehension, ast.ExceptHandler, ast.alias, ast.withitem,
+                ast.Lambda, ast.arguments, ast.FunctionDef, ast.Return,
+                ast.If, ast.For, ast.While, ast.With, ast.Try, ast.Except,
+                ast.Pass, ast.Break, ast.Continue, ast.Assert
+            }
+            
+            # Define dangerous operations to avoid
+            dangerous_ops = {
+                'exec', 'eval', 'compile', 'open', 'file', 'input', 'raw_input',
+                '__import__', 'reload', 'execfile', 'globals', 'locals', 'vars',
+                'dir', 'hasattr', 'getattr', 'setattr', 'delattr', 'isinstance',
+                'issubclass', 'callable', 'type', 'id', 'hash', 'repr', 'str',
+                'bytes', 'bytearray', 'memoryview', 'complex', 'dict', 'frozenset',
+                'list', 'object', 'property', 'reversed', 'set', 'slice', 'sorted',
+                'staticmethod', 'super', 'tuple', 'zip', 'exit', 'quit'
+            }
+            
+            # Walk through the AST and check for dangerous operations
+            for node in ast.walk(tree):
+                if type(node) not in allowed_nodes:
+                    log_event("WARNING", f"Potentially unsafe AST node: {type(node).__name__}")
+                    return False
+                
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name) and node.func.id in dangerous_ops:
+                        log_event("WARNING", f"Dangerous function call detected: {node.func.id}")
+                        return False
+                    
+                    if isinstance(node.func, ast.Attribute):
+                        if node.func.attr in dangerous_ops:
+                            log_event("WARNING", f"Dangerous method call detected: {node.func.attr}")
+                            return False
+                
+                if isinstance(node, ast.Import) or isinstance(node, ast.ImportFrom):
+                    # Only allow pandas and numpy imports
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.name not in ['pandas', 'numpy', 'pd', 'np']:
+                                log_event("WARNING", f"Unauthorized import: {alias.name}")
+                                return False
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module not in ['pandas', 'numpy', 'datetime', 'math']:
+                            log_event("WARNING", f"Unauthorized import from: {node.module}")
+                            return False
+            
+            return True
+            
+        except SyntaxError as e:
+            log_event("ERROR", f"Syntax error in code: {e}")
+            return False
+        except Exception as e:
+            log_event("ERROR", f"Error parsing code for safety: {e}")
+            return False
+
     def execute_pandas_query(self, pandas_query):
-        """Execute the generated pandas query safely"""
+        """Execute multi-line pandas queries safely"""
         if not pandas_query or self.data.empty:
             return None
 
         try:
             # Log the query being executed for debugging
             log_event("INFO", f"Executing pandas query: {pandas_query}")
+            
+            # Safety check
+            if not self.is_safe_code(pandas_query):
+                log_event("ERROR", "Code failed safety check")
+                return None
 
             # Create a safe execution environment
             safe_globals = {
                 'df': self.data,
                 'pd': pd,
-                'np': np
+                'np': np,
+                '__builtins__': {
+                    'len': len,
+                    'max': max,
+                    'min': min,
+                    'sum': sum,
+                    'abs': abs,
+                    'round': round,
+                    'int': int,
+                    'float': float,
+                    'str': str,
+                    'bool': bool,
+                    'list': list,
+                    'tuple': tuple,
+                    'dict': dict,
+                    'set': set,
+                    'range': range,
+                    'enumerate': enumerate,
+                    'zip': zip,
+                    'sorted': sorted,
+                    'reversed': reversed,
+                    'any': any,
+                    'all': all,
+                    'isinstance': isinstance,
+                    'type': type,
+                    'print': print  # For debugging
+                }
             }
+            
+            # Create a local namespace for execution
+            local_vars = {}
 
-            # Execute the query
-            result = eval(pandas_query, safe_globals)
+            # Execute the multi-line code
+            exec(pandas_query, safe_globals, local_vars)
+
+            # Get the result
+            result = local_vars.get('result')
+            
+            if result is None:
+                # If no 'result' variable was created, try to get the last expression
+                log_event("WARNING", "No 'result' variable found, trying to evaluate as expression")
+                # Try to evaluate as single expression
+                try:
+                    result = eval(pandas_query, safe_globals)
+                except:
+                    log_event("ERROR", "Could not find result variable or evaluate as expression")
+                    return None
 
             # Convert result to appropriate format
             if isinstance(result, pd.DataFrame):
@@ -451,6 +590,7 @@ IMPORTANT:
         except Exception as e:
             log_event("ERROR", f"Error executing pandas query: {e}")
             log_event("ERROR", f"Failed query was: {pandas_query}")
+            log_event("ERROR", f"Full traceback: {traceback.format_exc()}")
 
             # Additional debugging: check if it's a column access error
             if "KeyError" in str(e) or "not found" in str(e).lower():

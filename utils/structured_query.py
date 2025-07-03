@@ -331,8 +331,14 @@ class StructuredDataSearcher:
         return sorted(fuzzy_matches, key=lambda x: x['similarity'], reverse=True)[:3]
 
     def generate_pandas_query(self, query, relevant_columns):
+        """Enhanced query generation with multi-step support"""
         if not relevant_columns:
             return None
+
+        # Check for hardcoded patterns first (for demo reliability)
+        hardcoded_result = self._check_hardcoded_patterns(query)
+        if hardcoded_result:
+            return hardcoded_result
 
         # Validate columns exist in actual DataFrame
         valid_columns = []
@@ -390,8 +396,18 @@ User Query: {query}
 IMPORTANT: 
 - The columns are sorted by relevance using cosine similarity matching.
 - Focus on columns with higher relevance scores and multiple query matches.
-- The query may be complex and request multiple pieces of information - handle all parts.
-- Generate a pandas query that comprehensively addresses the user's natural language request.
+- For complex calculations requiring multiple steps, you can use multiple lines separated by newlines.
+- Example multi-step format:
+  total_payments = len(df)
+  successful_payments = len(df[df['payment_status'] == 'success'])
+  success_rate = (successful_payments / total_payments) * 100
+
+MULTI-STEP CALCULATION EXAMPLES:
+- Success Factor: Calculate total count, then successful count, then percentage
+- Conversion Rate: Calculate total leads, then conversions, then rate
+- Average by Group: Group data, then calculate averages
+
+Generate a pandas query that comprehensively addresses the user's natural language request.
 """
 
             pandas_query = call_llm(query=query, prompt=enhanced_prompt, temp=0.1)
@@ -410,13 +426,44 @@ IMPORTANT:
             log_event("ERROR", f"Error generating pandas query: {e}")
             return None
 
+    def _check_hardcoded_patterns(self, query):
+        """Check for hardcoded patterns that need special handling"""
+        query_lower = query.lower()
+        
+        # Success factor/rate patterns
+        success_patterns = ['success factor', 'success rate', 'conversion rate', 'completion rate']
+        if any(pattern in query_lower for pattern in success_patterns):
+            return self._generate_success_factor_query()
+        
+        # Add more patterns as needed
+        return None
+
+    def _generate_success_factor_query(self):
+        """Generate a multi-step query for success factor calculation"""
+        # Find relevant status columns
+        status_columns = [col for col in self.data.columns 
+                         if any(term in col.lower() for term in ['status', 'success', 'result', 'outcome', 'state'])]
+        
+        if not status_columns:
+            return None
+        
+        status_col = status_columns[0]  # Use the first matching column
+        
+        # Generate multi-step query
+        query = f"""total_count = len(df)
+success_count = len(df[df['{status_col}'].astype(str).str.lower().str.contains('success|complete|paid|approved|done', na=False)])
+success_factor = (success_count / total_count * 100) if total_count > 0 else 0
+{{'total_records': total_count, 'successful_records': success_count, 'success_factor_percentage': round(success_factor, 2)}}"""
+        
+        log_event("INFO", f"Generated hardcoded success factor query using column: {status_col}")
+        return query
+
     def execute_pandas_query(self, pandas_query):
-        """Execute the generated pandas query safely"""
+        """Execute pandas query with support for multi-step calculations"""
         if not pandas_query or self.data.empty:
             return None
 
         try:
-            # Log the query being executed for debugging
             log_event("INFO", f"Executing pandas query: {pandas_query}")
 
             # Create a safe execution environment
@@ -426,27 +473,13 @@ IMPORTANT:
                 'np': np
             }
 
-            # Execute the query
-            result = eval(pandas_query, safe_globals)
-
-            # Convert result to appropriate format
-            if isinstance(result, pd.DataFrame):
-                if result.empty:
-                    log_event("INFO", "Query executed but returned no data")
-                    return None
-                result_dict = result.to_dict('records')
-                log_event("SUCCESS", f"Query executed successfully, returned {len(result_dict)} records")
-                return result_dict
-            elif isinstance(result, pd.Series):
-                if result.empty:
-                    log_event("INFO", "Query executed but returned no data")
-                    return None
-                result_dict = result.to_dict()
-                log_event("SUCCESS", f"Query executed successfully, returned series data")
-                return result_dict
+            # Check if this is a multi-step query
+            if self._is_multi_step_query(pandas_query):
+                return self._execute_multi_step_query(pandas_query, safe_globals)
             else:
-                log_event("SUCCESS", f"Query executed successfully, returned: {result}")
-                return str(result)
+                # Single-step execution (original logic)
+                result = eval(pandas_query, safe_globals)
+                return self._format_result(result)
 
         except Exception as e:
             log_event("ERROR", f"Error executing pandas query: {e}")
@@ -458,6 +491,82 @@ IMPORTANT:
                 log_event("INFO", f"Available columns in DataFrame: {list(self.data.columns)[:10]}...")
 
             return None
+
+    def _is_multi_step_query(self, query):
+        """Detect if query requires multiple steps"""
+        multi_step_indicators = [
+            '\n',  # Multiple lines
+            ';',   # Multiple statements  
+            'total_', 'successful_', 'temp_', 'step_', 'count_', 'rate_', 'factor_',  # Common intermediate variables
+            '=.*\n',  # Assignment followed by newline
+        ]
+        
+        return any(indicator in query for indicator in multi_step_indicators)
+
+    def _execute_multi_step_query(self, pandas_query, safe_globals):
+        """Execute multi-step pandas queries safely"""
+        try:
+            log_event("INFO", "Executing multi-step query")
+            
+            # Split query into individual statements
+            statements = self._split_query_statements(pandas_query)
+            
+            result = None
+            # Execute each statement
+            for i, statement in enumerate(statements):
+                statement = statement.strip()
+                if not statement:
+                    continue
+                    
+                log_event("INFO", f"Executing step {i+1}: {statement}")
+                
+                # Execute statement
+                result = eval(statement, safe_globals)
+                
+                # Store intermediate results in safe_globals for next steps
+                if '=' in statement and not statement.startswith('{'):
+                    var_name = statement.split('=')[0].strip()
+                    safe_globals[var_name] = result
+                    log_event("INFO", f"Stored intermediate result: {var_name} = {result}")
+            
+            # Return the final result
+            return self._format_result(result)
+            
+        except Exception as e:
+            log_event("ERROR", f"Error in multi-step execution: {e}")
+            return None
+
+    def _split_query_statements(self, query):
+        """Split multi-step query into individual statements"""
+        # Handle different separators
+        if '\n' in query:
+            statements = query.split('\n')
+        elif ';' in query:
+            statements = query.split(';')
+        else:
+            statements = [query]
+        
+        return [stmt.strip() for stmt in statements if stmt.strip()]
+
+    def _format_result(self, result):
+        """Format the result consistently"""
+        if isinstance(result, pd.DataFrame):
+            if result.empty:
+                log_event("INFO", "Query executed but returned no data")
+                return None
+            result_dict = result.to_dict('records')
+            log_event("SUCCESS", f"Query executed successfully, returned {len(result_dict)} records")
+            return result_dict
+        elif isinstance(result, pd.Series):
+            if result.empty:
+                log_event("INFO", "Query executed but returned no data")
+                return None
+            result_dict = result.to_dict()
+            log_event("SUCCESS", f"Query executed successfully, returned series data")
+            return result_dict
+        else:
+            log_event("SUCCESS", f"Query executed successfully, returned: {result}")
+            return result
 
 
 def get_searcher_instance():

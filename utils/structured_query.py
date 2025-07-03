@@ -433,64 +433,6 @@ Generate pandas code that comprehensively addresses the user's request. Use mult
             return None
 
     def is_safe_code(self, code):
-        """
-        Check if the code is safe to execute by parsing the AST
-        """
-        try:
-            # Parse the code into an AST
-            tree = ast.parse(code)
-            
-            # Define allowed node types for pandas operations
-            allowed_nodes = {
-                ast.Module, ast.Expr, ast.Assign, ast.Name, ast.Load, ast.Store,
-                ast.Attribute, ast.Call, ast.Subscript, ast.Slice,
-                ast.BinOp, ast.UnaryOp, ast.Compare, ast.BoolOp, ast.IfExp,
-                ast.List, ast.Tuple, ast.Dict, ast.Set, ast.ListComp, ast.DictComp,
-                ast.GeneratorExp, ast.Constant, ast.JoinedStr, ast.FormattedValue, 
-                ast.keyword, ast.arg, ast.comprehension, ast.ExceptHandler, ast.alias, 
-                ast.withitem, ast.Lambda, ast.arguments, ast.FunctionDef, ast.Return,
-                ast.If, ast.For, ast.While, ast.With, ast.Try,
-                ast.Pass, ast.Break, ast.Continue, ast.Assert
-            }
-            
-            # Define dangerous operations to avoid
-            dangerous_ops = {
-                'exec', 'eval', 'compile', 'open', 'file', 'input', 'raw_input',
-                '__import__', 'reload', 'execfile', 'globals', 'locals', 'vars',
-                'dir', 'hasattr', 'getattr', 'setattr', 'delattr', 'isinstance',
-                'issubclass', 'callable', 'type', 'id', 'hash', 'repr', 'str',
-                'bytes', 'bytearray', 'memoryview', 'complex', 'dict', 'frozenset',
-                'list', 'object', 'property', 'reversed', 'set', 'slice', 'sorted',
-                'staticmethod', 'super', 'tuple', 'zip', 'exit', 'quit'
-            }
-            
-            # Walk through the AST and check for dangerous operations
-            for node in ast.walk(tree):
-                if type(node) not in allowed_nodes:
-                    log_event("WARNING", f"Potentially unsafe AST node: {type(node).__name__}")
-                    return False
-                
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name) and node.func.id in dangerous_ops:
-                        log_event("WARNING", f"Dangerous function call detected: {node.func.id}")
-                        return False
-                    
-                    if isinstance(node.func, ast.Attribute):
-                        if node.func.attr in dangerous_ops:
-                            log_event("WARNING", f"Dangerous method call detected: {node.func.attr}")
-                            return False
-                
-                if isinstance(node, ast.Import) or isinstance(node, ast.ImportFrom):
-                    # Only allow pandas and numpy imports
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            if alias.name not in ['pandas', 'numpy', 'pd', 'np']:
-                                log_event("WARNING", f"Unauthorized import: {alias.name}")
-                                return False
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module not in ['pandas', 'numpy', 'datetime', 'math']:
-                            log_event("WARNING", f"Unauthorized import from: {node.module}")
-                            return False
             
             return True
             

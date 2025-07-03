@@ -432,17 +432,6 @@ Generate pandas code that comprehensively addresses the user's request. Use mult
             log_event("ERROR", f"Error generating pandas query: {e}")
             return None
 
-    def is_safe_code(self, code):
-            
-            return True
-            
-        except SyntaxError as e:
-            log_event("ERROR", f"Syntax error in code: {e}")
-            return False
-        except Exception as e:
-            log_event("ERROR", f"Error parsing code for safety: {e}")
-            return False
-
     def execute_pandas_query(self, pandas_query):
         """Execute multi-line pandas queries safely"""
         if not pandas_query or self.data.empty:
@@ -454,9 +443,6 @@ Generate pandas code that comprehensively addresses the user's request. Use mult
             log_event("DEBUG", f"Full pandas query to execute: {repr(pandas_query)}")
             
             # Safety check
-            if not self.is_safe_code(pandas_query):
-                log_event("ERROR", "Code failed safety check")
-                return None
 
             # Create a safe execution environment
             safe_globals = {

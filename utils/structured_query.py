@@ -501,8 +501,8 @@ def is_safe_code(self, code):
     except Exception as e:
         log_event("ERROR", f"Error parsing code for safety: {e}")
         return False
-        
-    def execute_pandas_query(self, pandas_query):
+    
+def execute_pandas_query(self, pandas_query):
         """Execute multi-line pandas queries safely"""
         if not pandas_query or self.data.empty:
             return None

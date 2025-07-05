@@ -5,11 +5,35 @@ import numpy as np
 from botocore.exceptions import ClientError
 from typing import List, Union
 
-# Initialize Bedrock client
-bedrock_client = boto3.client(
-    'bedrock-runtime',
-    region_name=os.getenv('AWS_REGION', 'eu-north-1'),
-)
+# Initialize Bedrock client with credentials support
+def get_bedrock_client():
+    """
+    Initialize Bedrock client with proper credential handling
+    """
+    # Option 1: Use environment variables
+    aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+    
+    if aws_access_key_id and aws_secret_access_key:
+        # Use explicit credentials from environment variables
+        client = boto3.client(
+            'bedrock-runtime',
+            region_name=os.getenv('AWS_REGION', 'eu-north-1'),
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token  # Will be None if not set
+        )
+    else:
+        # Fall back to default credential chain (AWS CLI, credentials file, etc.)
+        client = boto3.client(
+            'bedrock-runtime',
+            region_name=os.getenv('AWS_REGION', 'eu-north-1'),
+        )
+    
+    return client
+
+# Initialize the client
+bedrock_client = get_bedrock_client()
 
 def call_llm(query, prompt=None, temp=0.7):
     """

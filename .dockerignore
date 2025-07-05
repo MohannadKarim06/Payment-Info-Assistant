@@ -7,3 +7,4 @@ start.sh
 *.log
 __pycache__/
 structured_data.xlsx
+.env

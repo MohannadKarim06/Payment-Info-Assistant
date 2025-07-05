@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv(dotenv_path='C:\Gaurav\Gaurav CV et al\AI project\1st project on using dwh data for analysing payment data\POC data\New Github Repo\Payment-Info-Assistant\.env')
+load_dotenv()
 import boto3
 import json
 import os

@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path='C:\Gaurav\Gaurav CV et al\AI project\1st project on using dwh data for analysing payment data\POC data\New Github Repo\Payment-Info-Assistant')
 import boto3
 import json
 import os
@@ -15,6 +15,7 @@ def get_bedrock_client():
     # Option 1: Use environment variables
     aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
     aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+    aws_session_token = os.getenv('AWS_SESSION_TOKEN')  # Fix: Define this variable
     
     if aws_access_key_id and aws_secret_access_key:
         # Use explicit credentials from environment variables
